@@ -16,6 +16,8 @@ import PIL.Image as Image
 channelaccesstoken="dummy"
 s3_client = boto3.client('s3')
 s3_resource = boto3.resource('s3')
+rekognition = boto3.client('rekognition')
+
 
 ##################
 # Methods with line-bot-sdk
@@ -61,8 +63,8 @@ def save_image(imageid,path):
             fd.write(chunk)
 
 
-##################
-# Methods with AWS
+#######################
+# Methods with AWS S3
 def save_fileobj_s3(data,bucket,key):
     targetbucket = s3_resource.Bucket(bucket)
     targetobj = targetbucket.Object(key)
@@ -83,6 +85,12 @@ def get_presigned_url(bucket,key):
         }
     )
     return url
+
+#################################
+# Methods with AWS Rekognition
+def detect_labels(bucket, key):
+    response = rekognition.detect_labels(Image={"S3Object": {"Bucket": bucket, "Name": key}})
+    return response
 
 ##################
 # Methods with PIL
@@ -135,10 +143,20 @@ def lambda_handler(event, context):
         save_file_s3(outputbuf,bucket,key)
 
         #5). get Rekognition result
+        detect_result = detect_labels(bucket, key)
+	print (detect_result)
+        results = detect_result["Labels"]
+        msg = "{}:{}\n{}:{}\n{}:{}".format(results[0]["Name"],results[0]["Confidence"],results[1]["Name"],results[1]["Confidence"],results[2]["Name"],results[2]["Confidence"])
+        if msg == "":
+            msg = "no result"
 
+        reply_txtmsg(replytoken,msg)
+
+        '''
         #6). reply line message
         imgurl = get_presigned_url(bucket,key)
         print (imgurl)
         reply_imgmsg(replytoken, imgurl)
+        '''
 
     print('end of lambda_handler')
